@@ -12,11 +12,8 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # Initialize Chroma client
 chroma_client = chromadb.Client()
 
-# Use OpenAI's text-embedding-ada-002 model for embeddings
-embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-    api_key=os.environ.get("OPENAI_API_KEY"),
-    model_name="text-embedding-ada-002"
-)
+# Use Chroma's default embedding function (Sentence Transformers)
+embedding_function = embedding_functions.DefaultEmbeddingFunction()
 
 # Create or get the collection
 collection = chroma_client.get_or_create_collection(
@@ -69,7 +66,7 @@ def chat_with_gpt(messages, relevant_docs):
         return f"An error occurred: {str(e)}"
 
 def main():
-    print("Welcome to the RAG-enhanced GPT-4 Chatbot!")
+    print("Welcome to the RAG-enhanced GPT-4o mini Chatbot!")
     print("Processing PDFs...")
     
     pdf_dir = 'pdf'  # Replace with your PDF directory path
