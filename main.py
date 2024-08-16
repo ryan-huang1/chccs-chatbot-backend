@@ -7,12 +7,18 @@ from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
 from tqdm import tqdm
 from flask import Flask, request, jsonify
+import random
+import json
 
 # Set the TOKENIZERS_PARALLELISM environment variable
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Initialize the OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+# Load random questions
+with open('school_board_questions.json', 'r') as f:
+    random_questions = json.load(f)
 
 # Initialize SentenceTransformer model with larger dimensions
 dimensions = 1024
@@ -133,6 +139,11 @@ def chat():
         "response": assistant_response,
         "conversation": conversation_history
     })
+
+@app.route('/random_question', methods=['GET'])
+def get_random_question():
+    random_question = random.choice(random_questions)
+    return jsonify({"question": random_question})
 
 if __name__ == "__main__":
     # Load existing embeddings or process PDFs
