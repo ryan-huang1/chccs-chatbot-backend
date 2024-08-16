@@ -6,6 +6,7 @@ import pickle
 from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
 from tqdm import tqdm
+from flask import Flask, request, jsonify
 
 # Set the TOKENIZERS_PARALLELISM environment variable
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -16,6 +17,8 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # Initialize SentenceTransformer model with larger dimensions
 dimensions = 1024
 model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1", truncate_dim=dimensions)
+
+app = Flask(__name__)
 
 class EmbeddingSearch:
     def __init__(self, embedding_file="embeddings.pkl"):
@@ -83,12 +86,8 @@ def add_documents_to_search(documents):
 def retrieve_relevant_docs(query, n_results=20):
     return searcher.search(query, top_k=n_results)
 
-def chat_with_gpt(messages, relevant_docs):
+def chat_with_gpt(messages):
     try:
-        # Prepend relevant documents to the system message
-        context = "Relevant information:\n" + "\n".join(relevant_docs)
-        messages[0]["content"] += f"\n\n{context}"
-        
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages
@@ -97,10 +96,46 @@ def chat_with_gpt(messages, relevant_docs):
     except Exception as e:
         return f"An error occurred: {str(e)}"
 
-def main():
-    print("Welcome to the RAG-enhanced GPT-4o mini Chatbot!")
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    user_input = data.get('message', '')
+    conversation_history = data.get('conversation', [])
+
+    if user_input.lower() == 'clear':
+        return jsonify({"response": "Conversation cleared.", "conversation": []})
+
+    # Retrieve relevant documents
+    relevant_docs = retrieve_relevant_docs(user_input)
     
-    # Try to load existing embeddings
+    if not conversation_history:
+        # Initialize with system message
+        conversation_history = [
+            {
+                "role": "system", 
+                "content": "You are a helpful assistant. Use the relevant information provided to answer questions accurately. Make sure to reference the source of the information, and don't make up information not given to you."
+            }
+        ]
+    
+    # Update system message with relevant documents
+    system_message = conversation_history[0]
+    context = "Relevant information:\n" + "\n".join(relevant_docs)
+    system_message["content"] = system_message["content"].split("\n\n")[0] + f"\n\n{context}"
+    conversation_history[0] = system_message
+
+    conversation_history.append({"role": "user", "content": user_input})
+    
+    assistant_response = chat_with_gpt(conversation_history)
+    
+    conversation_history.append({"role": "assistant", "content": assistant_response})
+    
+    return jsonify({
+        "response": assistant_response,
+        "conversation": conversation_history
+    })
+
+if __name__ == "__main__":
+    # Load existing embeddings or process PDFs
     if not searcher.load_embeddings():
         print("No existing embeddings found. Processing PDFs...")
         pdf_dir = 'pdf'  # Replace with your PDF directory path
@@ -110,29 +145,4 @@ def main():
     else:
         print(f"Loaded {len(searcher.documents)} document chunks from existing embeddings.")
 
-    print("Type 'quit' to exit the chat.")
-    
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant. Use the relevant information provided to answer questions accurately. Make sure to reference the source of the information, and don't make up informattion not given to you."}
-    ]
-    
-    while True:
-        user_input = input("You: ")
-        
-        if user_input.lower() == 'quit':
-            print("Goodbye!")
-            break
-        
-        # Retrieve relevant documents
-        relevant_docs = retrieve_relevant_docs(user_input)
-        
-        messages.append({"role": "user", "content": user_input})
-        
-        assistant_response = chat_with_gpt(messages, relevant_docs)
-        print("Assistant:", assistant_response)
-        print()  # Add a blank line for better readability
-        
-        messages.append({"role": "assistant", "content": assistant_response})
-
-if __name__ == "__main__":
-    main()
+    app.run(debug=True)
