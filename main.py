@@ -80,7 +80,7 @@ def process_pdfs(pdf_dir):
 def add_documents_to_search(documents):
     searcher.add_documents(documents)
 
-def retrieve_relevant_docs(query, n_results=5):
+def retrieve_relevant_docs(query, n_results=20):
     return searcher.search(query, top_k=n_results)
 
 def chat_with_gpt(messages, relevant_docs):
@@ -113,7 +113,7 @@ def main():
     print("Type 'quit' to exit the chat.")
     
     messages = [
-        {"role": "system", "content": "You are a helpful assistant. Use the relevant information provided to answer questions accurately."}
+        {"role": "system", "content": "You are a helpful assistant. Use the relevant information provided to answer questions accurately. Make sure to reference the source of the information, and don't make up informattion not given to you."}
     ]
     
     while True:
