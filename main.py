@@ -13,8 +13,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # Initialize the OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Initialize SentenceTransformer model
-model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1")
+# Initialize SentenceTransformer model with larger dimensions
+dimensions = 1024
+model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1", truncate_dim=dimensions)
 
 class EmbeddingSearch:
     def __init__(self, embedding_file="embeddings.pkl"):
@@ -50,7 +51,8 @@ class EmbeddingSearch:
         self.save_embeddings()
 
     def search(self, query, top_k=5):
-        query_embedding = model.encode([query])[0]
+        query_with_prompt = f"Represent this sentence for searching relevant passages: {query}"
+        query_embedding = model.encode([query_with_prompt])[0]
         scores = np.dot(self.embeddings, query_embedding)
         top_results = np.argsort(scores)[::-1][:top_k]
         
