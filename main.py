@@ -7,6 +7,9 @@ from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
 from tqdm import tqdm
 
+# Set the TOKENIZERS_PARALLELISM environment variable
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # Initialize the OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
@@ -24,8 +27,10 @@ class EmbeddingSearch:
             print("Loading pre-computed embeddings...")
             with open(self.embedding_file, 'rb') as f:
                 self.documents, self.embeddings = pickle.load(f)
+            return True
         else:
             print("No pre-computed embeddings found.")
+            return False
 
     def save_embeddings(self):
         print("Saving embeddings...")
@@ -53,7 +58,6 @@ class EmbeddingSearch:
 
 # Initialize EmbeddingSearch
 searcher = EmbeddingSearch()
-searcher.load_embeddings()
 
 def process_pdfs(pdf_dir):
     documents = []
@@ -93,13 +97,17 @@ def chat_with_gpt(messages, relevant_docs):
 
 def main():
     print("Welcome to the RAG-enhanced GPT-4o mini Chatbot!")
-    print("Processing PDFs...")
     
-    pdf_dir = 'pdf'  # Replace with your PDF directory path
-    documents = process_pdfs(pdf_dir)
-    add_documents_to_search(documents)
-    
-    print(f"Processed and added {len(documents)} document chunks.")
+    # Try to load existing embeddings
+    if not searcher.load_embeddings():
+        print("No existing embeddings found. Processing PDFs...")
+        pdf_dir = 'pdf'  # Replace with your PDF directory path
+        documents = process_pdfs(pdf_dir)
+        add_documents_to_search(documents)
+        print(f"Processed and added {len(documents)} document chunks.")
+    else:
+        print(f"Loaded {len(searcher.documents)} document chunks from existing embeddings.")
+
     print("Type 'quit' to exit the chat.")
     
     messages = [
