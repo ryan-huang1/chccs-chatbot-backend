@@ -1,7 +1,8 @@
 import os
 from openai import OpenAI
-import chromadb
-from chromadb.utils import embedding_functions
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import pickle
 from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
 from tqdm import tqdm
@@ -9,17 +10,50 @@ from tqdm import tqdm
 # Initialize the OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Initialize Chroma client
-chroma_client = chromadb.Client()
+# Initialize SentenceTransformer model
+model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1")
 
-# Use Chroma's default embedding function (Sentence Transformers)
-embedding_function = embedding_functions.DefaultEmbeddingFunction()
+class EmbeddingSearch:
+    def __init__(self, embedding_file="embeddings.pkl"):
+        self.embedding_file = embedding_file
+        self.documents = []
+        self.embeddings = []
 
-# Create or get the collection
-collection = chroma_client.get_or_create_collection(
-    name="rag_documents",
-    embedding_function=embedding_function
-)
+    def load_embeddings(self):
+        if os.path.exists(self.embedding_file):
+            print("Loading pre-computed embeddings...")
+            with open(self.embedding_file, 'rb') as f:
+                self.documents, self.embeddings = pickle.load(f)
+        else:
+            print("No pre-computed embeddings found.")
+
+    def save_embeddings(self):
+        print("Saving embeddings...")
+        with open(self.embedding_file, 'wb') as f:
+            pickle.dump((self.documents, self.embeddings), f)
+
+    def add_documents(self, documents):
+        print("Encoding documents...")
+        new_embeddings = []
+        for doc in tqdm(documents, desc="Embedding documents"):
+            new_embeddings.append(model.encode(doc))
+        
+        self.documents.extend(documents)
+        self.embeddings.extend(new_embeddings)
+        self.embeddings = np.array(self.embeddings)
+        
+        self.save_embeddings()
+
+    def search(self, query, top_k=5):
+        query_embedding = model.encode([query])[0]
+        scores = np.dot(self.embeddings, query_embedding)
+        top_results = np.argsort(scores)[::-1][:top_k]
+        
+        return [self.documents[i] for i in top_results]
+
+# Initialize EmbeddingSearch
+searcher = EmbeddingSearch()
+searcher.load_embeddings()
 
 def process_pdfs(pdf_dir):
     documents = []
@@ -37,19 +71,11 @@ def process_pdfs(pdf_dir):
     
     return documents
 
-def add_documents_to_chroma(documents):
-    for i, doc in tqdm(enumerate(documents), desc="Adding to Chroma", total=len(documents)):
-        collection.add(
-            documents=[doc],
-            ids=[f"doc_{i}"]
-        )
+def add_documents_to_search(documents):
+    searcher.add_documents(documents)
 
 def retrieve_relevant_docs(query, n_results=5):
-    results = collection.query(
-        query_texts=[query],
-        n_results=n_results
-    )
-    return results['documents'][0]
+    return searcher.search(query, top_k=n_results)
 
 def chat_with_gpt(messages, relevant_docs):
     try:
@@ -71,9 +97,9 @@ def main():
     
     pdf_dir = 'pdf'  # Replace with your PDF directory path
     documents = process_pdfs(pdf_dir)
-    add_documents_to_chroma(documents)
+    add_documents_to_search(documents)
     
-    print(f"Processed and added {len(documents)} document chunks to Chroma.")
+    print(f"Processed and added {len(documents)} document chunks.")
     print("Type 'quit' to exit the chat.")
     
     messages = [
