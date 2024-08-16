@@ -117,16 +117,16 @@ def chat():
             }
         ]
     
-    # Update system message with relevant documents
-    system_message = conversation_history[0]
+    # Attach relevant information to the user's query
     context = "Relevant information:\n" + "\n".join(relevant_docs)
-    system_message["content"] = system_message["content"].split("\n\n")[0] + f"\n\n{context}"
-    conversation_history[0] = system_message
+    enhanced_user_input = f"{user_input}\n\n{context}"
 
-    conversation_history.append({"role": "user", "content": user_input})
+    conversation_history.append({"role": "user", "content": enhanced_user_input})
     
     assistant_response = chat_with_gpt(conversation_history)
     
+    # Add the original user input (without the relevant info) to the conversation history
+    conversation_history[-1]["content"] = user_input
     conversation_history.append({"role": "assistant", "content": assistant_response})
     
     return jsonify({
