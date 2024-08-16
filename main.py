@@ -7,6 +7,7 @@ from unstructured.partition.pdf import partition_pdf
 from unstructured.chunking.title import chunk_by_title
 from tqdm import tqdm
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import random
 import json
 
@@ -25,6 +26,8 @@ dimensions = 1024
 model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1", truncate_dim=dimensions)
 
 app = Flask(__name__)
+CORS(app)  # This line enables CORS for all routes
+
 
 class EmbeddingSearch:
     def __init__(self, embedding_file="embeddings.pkl"):
