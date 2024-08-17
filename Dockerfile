@@ -12,8 +12,8 @@ RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/
 RUN pip3 install transformers tqdm numpy scikit-learn scipy nltk sentencepiece
 
 RUN pip install --no-cache-dir openai
+RUN pip install --no-cache-dir pdfminer.six
 RUN pip install --no-cache-dir unstructured
-RUN pip install --no-cache-dir pdfminer
 RUN pip install --no-cache-dir sentence-transformers
 RUN pip install --no-cache-dir Flask
 RUN pip install --no-cache-dir Flask-CORS
