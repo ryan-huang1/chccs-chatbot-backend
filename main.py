@@ -26,8 +26,7 @@ dimensions = 1024
 model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1", truncate_dim=dimensions)
 
 app = Flask(__name__)
-CORS(app)  # This line enables CORS for all routes
-
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 class EmbeddingSearch:
     def __init__(self, embedding_file="embeddings.pkl"):
@@ -143,10 +142,14 @@ def chat():
         "conversation": conversation_history
     })
 
-@app.route('/random_question', methods=['GET'])
+@app.route('/random_question', methods=['GET', 'OPTIONS'])
 def get_random_question():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'OK'}), 200
+    
     random_question = random.choice(random_questions)
     return jsonify({"question": random_question})
+
 
 if __name__ == "__main__":
     # Load existing embeddings or process PDFs
