@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir openai
 RUN pip install --no-cache-dir pdfminer.six
 RUN pip install --no-cache-dir pillow-heif
 RUN pip install --no-cache-dir matplotlib
-RUN pip install --no-cache-dir "unstructured[all]"
+RUN pip install --no-cache-dir "unstructured[all-docs]"
 RUN pip install --no-cache-dir sentence-transformers
 RUN pip install --no-cache-dir Flask
 RUN pip install --no-cache-dir Flask-CORS
