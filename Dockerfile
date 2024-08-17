@@ -7,12 +7,16 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . /app
 
+# Install Pillow first
+RUN pip install --no-cache-dir pillow
+
 # Install Python packages individually
 RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 RUN pip3 install transformers tqdm numpy scikit-learn scipy nltk sentencepiece
 
 RUN pip install --no-cache-dir openai
 RUN pip install --no-cache-dir pdfminer.six
+RUN pip install --no-cache-dir pillow-heif
 RUN pip install --no-cache-dir unstructured
 RUN pip install --no-cache-dir sentence-transformers
 RUN pip install --no-cache-dir Flask
