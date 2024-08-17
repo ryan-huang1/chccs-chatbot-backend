@@ -7,8 +7,20 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages individually
+RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN pip3 install transformers tqdm numpy scikit-learn scipy nltk sentencepiece
+
+RUN pip install --no-cache-dir openai
+RUN pip install --no-cache-dir unstructured
+RUN pip install --no-cache-dir sentence-transformers
+RUN pip install --no-cache-dir Flask
+RUN pip install --no-cache-dir Flask-CORS
 
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
