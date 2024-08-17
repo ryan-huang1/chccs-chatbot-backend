@@ -1,0 +1,7 @@
+openai
+sentence-transformers
+numpy
+unstructured
+tqdm
+Flask
+Flask-CORS
