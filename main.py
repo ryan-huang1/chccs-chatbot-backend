@@ -179,4 +179,4 @@ if __name__ == "__main__":
     else:
         print(f"Loaded {len(searcher.policy_chunks)} policy chunks from existing embeddings.")
 
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=80, debug=True)
