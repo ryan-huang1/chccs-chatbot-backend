@@ -1,4 +1,5 @@
 import os
+import re
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import numpy as np
@@ -28,17 +29,33 @@ model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1", truncate_dim=d
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+class PolicyChunk:
+    def __init__(self, text, policy_name):
+        self.text = text
+        self.policy_name = self.format_policy_name(policy_name)
+
+    @staticmethod
+    def format_policy_name(policy_name):
+        # Check if the policy name matches the pattern "Policy-XXXXXXXX"
+        match = re.match(r'Policy-(\d{4})(\d{4})', policy_name)
+        if match:
+            # If it matches, format it as "XXXX/XXXX"
+            return f"{match.group(1)}/{match.group(2)}"
+        else:
+            # If it doesn't match, return the original name
+            return policy_name
+
 class EmbeddingSearch:
     def __init__(self, embedding_file="embeddings.pkl"):
         self.embedding_file = embedding_file
-        self.documents = []
+        self.policy_chunks = []
         self.embeddings = []
 
     def load_embeddings(self):
         if os.path.exists(self.embedding_file):
             print("Loading pre-computed embeddings...")
             with open(self.embedding_file, 'rb') as f:
-                self.documents, self.embeddings = pickle.load(f)
+                self.policy_chunks, self.embeddings = pickle.load(f)
             return True
         else:
             print("No pre-computed embeddings found.")
@@ -47,15 +64,15 @@ class EmbeddingSearch:
     def save_embeddings(self):
         print("Saving embeddings...")
         with open(self.embedding_file, 'wb') as f:
-            pickle.dump((self.documents, self.embeddings), f)
+            pickle.dump((self.policy_chunks, self.embeddings), f)
 
-    def add_documents(self, documents):
-        print("Encoding documents...")
+    def add_policy_chunks(self, policy_chunks):
+        print("Encoding policy chunks...")
         new_embeddings = []
-        for doc in tqdm(documents, desc="Embedding documents"):
-            new_embeddings.append(model.encode(doc))
+        for chunk in tqdm(policy_chunks, desc="Embedding policy chunks"):
+            new_embeddings.append(model.encode(chunk.text))
         
-        self.documents.extend(documents)
+        self.policy_chunks.extend(policy_chunks)
         self.embeddings.extend(new_embeddings)
         self.embeddings = np.array(self.embeddings)
         
@@ -67,29 +84,30 @@ class EmbeddingSearch:
         scores = np.dot(self.embeddings, query_embedding)
         top_results = np.argsort(scores)[::-1][:top_k]
         
-        return [self.documents[i] for i in top_results]
+        return [self.policy_chunks[i] for i in top_results]
 
 # Initialize EmbeddingSearch
 searcher = EmbeddingSearch()
 
 def process_pdfs(pdf_dir):
-    documents = []
+    policy_chunks = []
     pdf_files = [f for f in os.listdir(pdf_dir) if f.endswith('.pdf')]
     
     for filename in tqdm(pdf_files, desc="Processing PDFs"):
         filepath = os.path.join(pdf_dir, filename)
+        policy_name = os.path.splitext(filename)[0]  # Use filename without extension as policy name
         try:
             elements = partition_pdf(filepath)
             chunks = chunk_by_title(elements)
             for chunk in chunks:
-                documents.append(chunk.text)
+                policy_chunks.append(PolicyChunk(chunk.text, policy_name))
         except Exception as e:
             print(f"Error processing {filename}: {str(e)}")
     
-    return documents
+    return policy_chunks
 
-def add_documents_to_search(documents):
-    searcher.add_documents(documents)
+def add_policy_chunks_to_search(policy_chunks):
+    searcher.add_policy_chunks(policy_chunks)
 
 def retrieve_relevant_docs(query, n_results=20):
     return searcher.search(query, top_k=n_results)
@@ -97,7 +115,7 @@ def retrieve_relevant_docs(query, n_results=20):
 def chat_with_gpt(messages):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4-turbo-preview",
             messages=messages
         )
         return response.choices[0].message.content
@@ -113,20 +131,20 @@ def chat():
     if user_input.lower() == 'clear':
         return jsonify({"response": "Conversation cleared.", "conversation": []})
 
-    # Retrieve relevant documents
-    relevant_docs = retrieve_relevant_docs(user_input)
+    # Retrieve relevant policy chunks
+    relevant_chunks = retrieve_relevant_docs(user_input)
     
     if not conversation_history:
         # Initialize with system message
         conversation_history = [
             {
                 "role": "system", 
-                "content": "You are a helpful assistant. Use the relevant information provided to answer questions accurately. Make sure to reference the source of the information, and don't make up information not given to you."
+                "content": "You are a helpful assistant. Use the relevant information provided to answer questions accurately. Make sure to reference the source of the information, including the policy number in the format XXXX/XXXX, and don't make up information not given to you. Use markdown formatting to make the information easier to read. Refernce the policy number of the information. Limit your response to 6 sentences or less."
             }
         ]
     
-    # Attach relevant information to the user's query
-    context = "Relevant information:\n" + "\n".join(relevant_docs)
+    # Attach relevant information to the user's query, including formatted policy names
+    context = "Relevant information:\n" + "\n".join([f"From Policy {chunk.policy_name}: {chunk.text}" for chunk in relevant_chunks])
     enhanced_user_input = f"{user_input}\n\n{context}"
 
     conversation_history.append({"role": "user", "content": enhanced_user_input})
@@ -150,16 +168,15 @@ def get_random_question():
     random_question = random.choice(random_questions)
     return jsonify({"question": random_question})
 
-
 if __name__ == "__main__":
     # Load existing embeddings or process PDFs
     if not searcher.load_embeddings():
         print("No existing embeddings found. Processing PDFs...")
         pdf_dir = 'pdf'  # Replace with your PDF directory path
-        documents = process_pdfs(pdf_dir)
-        add_documents_to_search(documents)
-        print(f"Processed and added {len(documents)} document chunks.")
+        policy_chunks = process_pdfs(pdf_dir)
+        add_policy_chunks_to_search(policy_chunks)
+        print(f"Processed and added {len(policy_chunks)} policy chunks.")
     else:
-        print(f"Loaded {len(searcher.documents)} document chunks from existing embeddings.")
+        print(f"Loaded {len(searcher.policy_chunks)} policy chunks from existing embeddings.")
 
     app.run(debug=True)
