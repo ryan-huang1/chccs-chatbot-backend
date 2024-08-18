@@ -115,7 +115,7 @@ def retrieve_relevant_docs(query, n_results=40):
 def chat_with_gpt(messages):
     try:
         response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-4o-mini",
             messages=messages
         )
         return response.choices[0].message.content
