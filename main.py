@@ -109,7 +109,7 @@ def process_pdfs(pdf_dir):
 def add_policy_chunks_to_search(policy_chunks):
     searcher.add_policy_chunks(policy_chunks)
 
-def retrieve_relevant_docs(query, n_results=20):
+def retrieve_relevant_docs(query, n_results=40):
     return searcher.search(query, top_k=n_results)
 
 def chat_with_gpt(messages):
